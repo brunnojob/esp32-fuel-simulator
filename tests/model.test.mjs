@@ -1,0 +1,10 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { plan, advance, cost, pulses } from '../web/model.mjs';
+const params = { mode: 'money', amount: 100, capacity: 50, initial: 10 };
+test('R$ 100 stops at 15.267 L within the budget', () => { const p = plan(params); assert.equal(p.targetMl, 15267); assert.equal(cost(p.targetMl), 10000); });
+test('10 litres costs R$ 65.50 and produces 4500 pulses', () => { const p = plan({ ...params, mode: 'litres', amount: 10 }); assert.equal(p.targetMl, 10000); assert.equal(cost(p.targetMl), 6550); assert.equal(pulses(p.targetMl), 4500); });
+test('a full tank never overflows', () => { const p = plan({ ...params, mode: 'litres', amount: 100, initial: 49 }); assert.equal(p.targetMl, 1000); assert.equal(p.limited, true); const s = advance({ ...p, ml: 0, elapsed: 0 }, 100, 60); assert.equal(s.ml, 1000); assert.equal(s.elapsed, 1); assert.equal(s.status, 'complete'); });
+test('fill mode targets free capacity', () => assert.equal(plan({ ...params, mode: 'full' }).targetMl, 40000));
+test('invalid values and a full tank are rejected', () => { for (const overrides of [{ amount: 0 }, { amount: NaN }, { initial: 51 }, { capacity: -1 }, { initial: 50 }, { initial: -1 }, { mode: 'bad' }]) assert.throws(() => plan({ ...params, ...overrides })); });
+test('frame partitioning preserves measured volume', () => { let s = { ...plan({ ...params, mode: 'litres', amount: 10 }), ml: 0, elapsed: 0 }; for (let i = 0; i < 100; i++) s = advance(s, .1, 30); assert.ok(Math.abs(s.ml - 5000) < 1e-8); assert.ok(Math.abs(s.elapsed - 10) < 1e-8); });
